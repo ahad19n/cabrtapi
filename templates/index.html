@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body style="margin: 0; padding: 0;">
+    <div id="map" style="width: 100%; height: 100vh;"></div>
+    <script>
+        const map = L.map('map').setView([33.66464870190348, 73.08707405003382], 12);
+
+        // Add the OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        // Retrieve custom marker text from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const markerText = urlParams.get('markerText') || 'You clicked here';
+
+        let currentMarker = null;
+
+        // Add event listener for right-click
+        map.on('contextmenu', function (event) {
+            const { lat, lng } = event.latlng;
+            console.log(`Coordinates: Latitude: ${lat}, Longitude: ${lng}`);
+
+            // Remove the old marker if it exists
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            // Show a marker on the map at the clicked location
+            currentMarker = L.marker([lat, lng]).addTo(map).bindPopup(`${markerText}<br>(${lat}, ${lng})`).openPopup();
+
+            // Send the coordinates to the endpoint using fetch
+            fetch('/setClickCoordinates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ latitude: lat, longitude: lng })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Successfully sent coordinates:', data);
+            })
+            .catch(error => {
+                console.error('Error sending coordinates:', error);
+            });
+        });
+    </script>
+</body>
+</html>
