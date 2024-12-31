@@ -1,10 +1,19 @@
 from requests import post
 from random import randint
 from polyline import decode
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, Response
 
-sessions = {}
 app = Flask(__name__)
+
+# ---------------------------------------------------------------------------- #
+
+cLoc = []
+dLoc = []
+uLoc = []
+
+idx = 0
+points = []
+complete = False
 
 # ---------------------------------------------------------------------------- #
 
@@ -26,25 +35,58 @@ def getPolyline(srcLoc, dstLoc):
 
 # ---------------------------------------------------------------------------- #
 
-@app.route('/')
+@app.route('/', methods=["GET"])
 def index():
-    sKey = request.args.get('sKey')
-    zLvl = request.args.get('zLvl', 14)
+    return render_template('index.html')
+
+@app.route('/setClickCoordinates', methods=["POST"])
+def recordUserClick():
+    global cLoc
+
+    data = request.get_json()
+    cLoc = [data['latitude'], data['longitude']]
+
+    return Response(f"OK", status=200, mimetype="text/plain"), 200
+
+@app.route('/getClickCoordinates', methods=["GET"])
+def getWhereUserClicked():
+    global cLoc
+
+    if len(cLoc):
+        return Response(f"{cLoc[0]}, {cLoc[1]}", status=200, mimetype="text/plain"), 200
+    else:
+        return Response(f"None, None", status=200, mimetype="text/plain"), 200
+
+# ---------------------------------------------------------------------------- #
+
+@app.route('/initTracking', methods=["GET"])
+def setTrackingPoints():
+    global idx, points, dLoc, uLoc
+
     uLoc = str2Coords(request.args.get('uLoc'))
     dLoc = str2Coords(request.args.get('dLoc'))
 
-    if sKey not in sessions:
-        sessions[sKey] = {}
-        sessions[sKey]['idx'] = 0
-        sessions[sKey]['points'] = [(p[0] / 10, p[1] / 10) for p in decode(getPolyline(dLoc, uLoc))]
+    idx = 0
+    points = [(p[0] / 10, p[1] / 10) for p in decode(getPolyline(dLoc, uLoc))]
 
-    else:
-        sessions[sKey]['idx'] += randint(1, 5)
-        if (sessions[sKey]['idx'] >= len(sessions[sKey]['points'])):
-            sessions[sKey]['idx'] = len(sessions[sKey]['points']) - 2
+    return Response(f"OK", status=200, mimetype="text/plain"), 200
 
-    dLoc = sessions[sKey]['points'][sessions[sKey]['idx']]
-    return render_template('map.html', uLoc=uLoc, dLoc=dLoc, zLvl=zLvl)
+@app.route('/showTrackingMap', methods=["GET"])
+def showTrackingMap():
+    global idx, points, dLoc, uLoc, complete
+
+    idx += randint(1, 5)
+    if idx >= len(points):
+        complete = True
+        idx = len(points) - 2
+
+    dLoc = points[idx]
+    return render_template('tracking.html', uLoc=uLoc, dLoc=dLoc)
+
+@app.route('/isTrackingComplete', methods=["GET"])
+def isTrackingComplete():
+    global complete
+    return Response(str(complete), status=200, mimetype="text/plain"), 200
 
 # ---------------------------------------------------------------------------- #
 
